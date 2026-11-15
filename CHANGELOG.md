@@ -12,6 +12,9 @@ First release of the ONYX CLI.
   `ONYX_MODEL` feeds retrieved records to any OpenAI-compatible server.
 - `onyx ask`, `onyx knowledge`, `onyx forget`, `onyx version`.
 - `basetrainer.txt`: generator prompt plus the training-data spec and example.
+- `base-training.jsonl`: a 53-record base pack on basic conversation and
+  English usage (greetings, small talk, politeness, tenses, homophones,
+  spelling, email tone), shipped in `training/` and attached to the release.
 - Browser build (`web/`) of the same app: no install and no SmartScreen
   prompt, Codex-style UI, JSONL training via file drop, picker or paste,
   knowledge saved in the browser with export/import of `onyx-knowledge.json`,
