@@ -31,6 +31,7 @@ jobs:
             GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath \
               -ldflags "-s -w -X main.Version=${version}" -o "$out" .
           done
+          cp training/base-training.jsonl dist/base-training.jsonl
           ( cd dist && sha256sum * > SHA256SUMS.txt )
 
       - name: Attach binaries to the release
