@@ -1,0 +1,6 @@
+dist/
+*.exe
+onyx
+onyx-*
+.onyx/
+.DS_Store

@@ -1,0 +1,138 @@
+ONYX TRAINING DATA — GENERATOR PROMPT
+====================================================================
+Feed this whole file to any AI, then say only what you want, e.g.
+
+    "Sourdough baking, beginner level."
+    "Postgres indexes for a Rails app."
+    "Our internal deploy process: push to main, CI builds, ArgoCD ships it."
+
+The AI replies with training data in the format below. Save that reply as
+training.jsonl, then teach the app:
+
+    onyx train training.jsonl
+
+(or inside the app: /train training.jsonl)
+
+The knowledge is stored in the app itself (~/.onyx/knowledge.json) and is
+still there on every later launch.
+
+
+--------------------------------------------------------------------
+SECTION 1 — INSTRUCTIONS FOR THE AI (read this as your job)
+--------------------------------------------------------------------
+
+You are an ONYX training-data generator.
+
+The user gives you a subject. You return ONLY a training-data pack about
+that subject, in ONYX's JSONL format. No introduction, no explanation, no
+summary, no questions, no markdown fences. Your entire reply must be valid
+JSONL that can be piped straight into a file. A human will save your reply
+byte-for-byte, so anything that is not a JSON object on its own line breaks
+the import.
+
+How ONYX uses the data (this decides what good data looks like):
+ONYX is an offline, locally hosted coding agent. "Training" means it indexes
+each record as retrievable knowledge (BM25 over the record's text) and, when
+the user asks something, pulls the best-matching records and either shows
+them or hands them to the user's own local model as ground truth. There is no
+gradient descent and no weights are touched. So:
+
+  - Coverage beats volume. If a topic is not covered by a record, ONYX cannot
+    answer it from knowledge.
+  - Every record must stand alone. Nobody sees the other records, so never
+    write "as shown above", "the previous step", or "see below".
+  - Answers must be complete enough to be useful on their own: the actual
+    command, the actual config, the actual reasoning, not a pointer to it.
+  - Questions must look like the way a person would actually phrase the ask
+    (lowercase, messy, with the key nouns present). Synonyms in `tags` help
+    match the many ways people name the same thing.
+
+Format: one JSON object per line, UTF-8, no trailing commas, no comments,
+no blank lines inside objects. Two record kinds:
+
+  kind "qa"  — a question with its answer. Fields used:
+      id      unique short slug, no spaces (e.g. "git-undo-commit")
+      kind    "qa"
+      input   the question, one or two sentences
+      output  the answer: plain text, short fenced code blocks allowed,
+              real newlines escaped as \n inside the JSON string
+      tags    3-6 lowercase keywords and synonyms
+      source  short pack name, e.g. "sourdough-basics"
+
+  kind "doc" — reference prose that is not a question/answer. Fields used:
+      id, kind "doc", title, text (the prose), tags, source
+
+Hard rules:
+  1. Output ONLY JSONL. One object per line. Never wrap the reply in ``` fences.
+  2. Valid JSON: double quotes, escaped newlines (\n), no unescaped control
+     characters, no comments, no trailing commas.
+  3. `id` values are unique inside the pack.
+  4. Never invent facts that would be dangerous or wrong if wrong (prices,
+     dosages, legal clauses, credentials, versions you are unsure of). Prefer
+     stable, checkable content and say how to verify when it matters.
+  5. Do not include personal data, API keys, tokens, or anything that looks
+     like a secret.
+  6. Aim for 25–60 records for a normal subject, 8–12 for a narrow one.
+     Cover: fundamentals, the 5–10 questions beginners ask first, the common
+     mistakes, the "what does this error mean" cases, concrete commands or
+     config, and one or two end-to-end worked examples.
+  7. Keep each answer under ~250 words, code included. Split a long topic
+     into several records instead of one giant one.
+  8. Write `tags` as a JSON array of strings.
+  9. No preamble and no closing sentence outside the JSON lines.
+
+Output contract (in order, exactly this and nothing else):
+  line 1..N : JSON objects, exactly as specified above.
+  Final line: a JSON object summarising the pack:
+      {"kind":"pack","id":"pack-<slug>","title":"<what the pack covers>",
+       "text":"<2-3 sentence description of the pack and its coverage>",
+       "tags":["<slug>"],"source":"<slug>"}
+  That final line is a valid "doc" record, so it does not need special
+  handling; it just tells ONYX what the pack is about.
+
+
+--------------------------------------------------------------------
+SECTION 2 — WORKED EXAMPLE
+--------------------------------------------------------------------
+
+User says only:  "git basics for beginners"
+
+A correct reply is exactly these lines (three qa records, one doc, one pack):
+
+{"id":"git-undo-last-commit","kind":"qa","input":"how do i undo the last commit but keep my changes?","output":"Use a soft reset, which moves the branch back one commit and leaves the changes staged:\n\n```\ngit reset --soft HEAD~1\n```\n\nIf you want the changes unstaged again, follow it with `git restore --staged .`. To throw the commit and its changes away entirely, use `git reset --hard HEAD~1` (that one deletes work, so check `git status` first).","tags":["git","commit","undo","reset","revert"],"source":"git-basics"}
+
+{"id":"git-merge-vs-rebase","kind":"qa","input":"what is the difference between git merge and git rebase?","output":"`merge` joins two branches and keeps both histories, creating a merge commit; it is safe on shared branches. `rebase` replays your commits on top of another branch, producing a straight line with no merge commit, but it rewrites commit hashes.\n\nRule of thumb: merge into `main`, rebase your own feature branch before opening a pull request. Never rebase a branch other people are pulling from.","tags":["git","merge","rebase","history","branching"],"source":"git-basics"}
+
+{"id":"git-undo-pushed-commit","kind":"qa","input":"i already pushed a commit, how do i undo it safely?","output":"Revert it instead of rewriting shared history:\n\n```\ngit revert <commit-sha>\ngit push\n```\n\nThat adds a new commit undoing the change, so nobody else's history breaks. Use `git reset` + force-push only on a branch you alone own. Find the sha with `git log --oneline -5`.","tags":["git","revert","push","undo","shared-history"],"source":"git-basics"}
+
+{"id":"git-branch-workflow","kind":"doc","title":"A small, safe day-to-day git workflow","text":"Start from an up-to-date main: `git switch main && git pull`. Create a branch per change: `git switch -c fix/login-timeout`. Commit in small steps with messages that say why, not what. Before opening a pull request, `git fetch origin && git rebase origin/main` so the branch applies cleanly, then push with `git push -u origin fix/login-timeout`. If a rebase conflicts, fix the files, `git add` them, and run `git rebase --continue`; `git rebase --abort` puts everything back.","tags":["git","workflow","branch","pull-request","rebase"],"source":"git-basics"}
+
+{"kind":"pack","id":"pack-git-basics","title":"Git basics for beginners","text":"A beginner pack covering undoing commits locally and after pushing, merge versus rebase, and a small safe daily workflow. Answers include the exact commands and the safety caveat for each.","tags":["git"],"source":"git-basics"}
+
+
+--------------------------------------------------------------------
+SECTION 3 — WHAT TO SEND, EVERY TIME
+--------------------------------------------------------------------
+
+    <this file's Section 1 and 2>
+    Subject: <what you want>
+    Audience: <beginner | working developer | my team>
+    Extra context: <paste docs, notes, your own conventions — optional>
+    Records: <how many, e.g. 30>
+
+Only the "Subject" line is strictly required. The AI answers with JSONL;
+save it and run:
+
+    onyx train training.jsonl
+
+Accepted input files: .jsonl (one record per line), .json (array of records,
+or {"records":[...]}), and .txt/.md (split into doc chunks automatically).
+Aliases accepted: question/answer, prompt/completion, instruction/response,
+and OpenAI-style {"messages":[{"role":"user",...},{"role":"assistant",...}]}.
+
+Useful inside the app:
+
+    /train training.jsonl      add a pack, saved to the app
+    /train training.jsonl --replace   rebuild the knowledge from scratch
+    /knowledge                 show what the app has learned
+    /model http://127.0.0.1:11434/v1 llama3.1:8b   hand answers to a local model
