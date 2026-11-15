@@ -99,50 +99,79 @@
     return div;
   }
 
-  function appendUser(text) {
-    var div = document.createElement('div');
-    div.className = 'line user';
-    var prompt = document.createElement('span');
-    prompt.className = 'prompt';
-    prompt.textContent = '›';
-    div.appendChild(prompt);
-    div.appendChild(document.createTextNode(text));
-    $('#scroll').appendChild(div);
-    toBottom();
-  }
-
-  function appendSources(hits) {
+  function bubble(role, extra) {
     var wrap = document.createElement('div');
-    wrap.className = 'sources';
-    var title = document.createElement('div');
-    title.className = 'src-title';
-    title.textContent = 'sources';
-    wrap.appendChild(title);
-    var list = document.createElement('ol');
-    hits.forEach(function (hit) {
-      var item = document.createElement('li');
-      var meta = hit.record.tags && hit.record.tags.length
-        ? hit.record.tags.join(', ')
-        : (hit.record.source || '');
-      item.textContent = Core.label(hit.record) + (meta ? '  —  ' + meta : '');
-      list.appendChild(item);
-    });
-    wrap.appendChild(list);
+    wrap.className = 'msg ' + role + (extra ? ' ' + extra : '');
+    var who = document.createElement('div');
+    who.className = 'who';
+    who.textContent = role === 'user' ? 'you' : 'onyx';
+    var bodyEl = document.createElement('div');
+    bodyEl.className = 'bubble';
+    wrap.appendChild(who);
+    wrap.appendChild(bodyEl);
     $('#scroll').appendChild(wrap);
+    toBottom();
+    return { wrap: wrap, body: bodyEl };
   }
 
-  function appendAnswer(ans) {
-    var bodyEl = document.createElement('div');
-    bodyEl.className = 'answer';
-    bodyEl.textContent = ans.text;
-    $('#scroll').appendChild(bodyEl);
-    if (ans.note) line('warn', '! ' + ans.note);
-    if (ans.hits && ans.hits.length) appendSources(ans.hits);
-    line('meta', [
-      modelLabel(),
-      formatNum(Core.estimateTokens(ans.text)) + ' tokens',
-      plural(ans.hits ? ans.hits.length : 0, 'knowledge hit')
-    ].join('  ·  '));
+  function appendUser(text) {
+    bubble('user').body.textContent = text;
+  }
+
+  function codeBlock(code, lang) {
+    var wrap = document.createElement('div');
+    wrap.className = 'codewrap';
+    var pre = document.createElement('pre');
+    pre.className = 'code';
+    var codeEl = document.createElement('code');
+    codeEl.textContent = code;
+    if (lang) codeEl.setAttribute('data-lang', lang);
+    pre.appendChild(codeEl);
+    wrap.appendChild(pre);
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'copy';
+    copy.textContent = 'copy';
+    copy.addEventListener('click', function () {
+      var done = function () {
+        copy.textContent = 'copied';
+        setTimeout(function () { copy.textContent = 'copy'; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done, function () { copy.textContent = 'select it'; });
+      } else {
+        copy.textContent = 'select it';
+      }
+    });
+    wrap.appendChild(copy);
+    return wrap;
+  }
+
+  function renderRich(target, text) {
+    var parts = String(text == null ? '' : text).split('```');
+    for (var i = 0; i < parts.length; i++) {
+      var chunk = parts[i];
+      if (i % 2 === 1) {
+        var lang = '';
+        var nl = chunk.indexOf('\n');
+        if (nl >= 0) {
+          lang = chunk.slice(0, nl).trim();
+          chunk = chunk.slice(nl + 1);
+        } else {
+          chunk = '';
+        }
+        if (chunk.trim()) target.appendChild(codeBlock(chunk.replace(/\s+$/, ''), lang));
+      } else if (chunk.trim()) {
+        var para = document.createElement('div');
+        para.className = 'prose';
+        para.textContent = chunk.replace(/^\n+/, '').replace(/\s+$/, '');
+        target.appendChild(para);
+      }
+    }
+  }
+
+  function appendAnswer(text) {
+    renderRich(bubble('assistant').body, text);
     toBottom();
   }
 
@@ -265,37 +294,32 @@
   }
 
   async function generate(query) {
-    var hits = Core.search(state.index, query, 6);
-    var ans = { text: '', hits: hits, note: '' };
+    var hits = Core.search(state.index, query, 5);
     if (modelEnabled()) {
       try {
-        ans.text = await complete(query, hits);
-        return ans;
+        return { text: await complete(query, hits) };
       } catch (err) {
-        var reason = String((err && err.message) || err).replace(/\s+/g, ' ').slice(0, 120);
-        ans.note = 'local model unavailable (' + reason + ') — answered from trained knowledge';
+        console.warn('onyx: local model unavailable, answering from trained knowledge', err);
       }
     }
-    ans.text = Core.retrievalAnswer(hits);
-    if (!modelEnabled()) {
-      ans.note = hits.length
-        ? 'no local model configured — showing your best matching trained records (/model to connect one)'
-        : 'no local model configured and nothing trained on that yet';
-    }
-    return ans;
+    var program = Core.programAnswer(query);
+    if (program) return { text: program.text };
+    return { text: Core.retrievalAnswer(hits) };
   }
 
   async function ask(text) {
     appendUser(text);
-    var thinking = line('dim', '· thinking');
     setBusy(true);
+    var pending = bubble('assistant', 'pending');
+    pending.body.textContent = '…';
     try {
       var ans = await generate(text);
-      thinking.remove();
-      appendAnswer(ans);
+      pending.wrap.remove();
+      appendAnswer(ans.text);
     } catch (err) {
-      thinking.remove();
-      line('error', '! ' + String((err && err.message) || err));
+      pending.wrap.remove();
+      appendAnswer('Sorry — that one failed on my side. Ask me again?');
+      console.warn('onyx: failed to answer', err);
     } finally {
       setBusy(false);
     }
@@ -624,7 +648,11 @@
     updateChrome();
     renderKnowledge();
     fillModelInputs();
-    line('dim', 'v' + Core.VERSION + ' · train a pack, then ask anything · /help');
+    appendAnswer(state.records.length
+      ? 'Hi — I\'m ONYX. I have ' + plural(state.records.length, 'record') +
+        ' trained in this browser, so ask away. Type /help to see the commands, or ask me for a Python script.'
+      : 'Hi — I\'m ONYX. I run entirely in this browser, so there is nothing to install and nothing to sign into. ' +
+        'Ask me something, or open /train to teach me with a pack.');
     if (window.location.protocol === 'file:') {
       line('warn', '! opened from a file — some browsers limit storage here, so use Export to keep knowledge');
     }

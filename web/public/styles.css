@@ -126,11 +126,78 @@ input:focus-visible, textarea:focus-visible, .drop:focus-visible {
 .line.head { color: var(--accent); font-weight: 700; margin-top: 14px; }
 .line.ok { color: var(--green); }
 
-.answer {
+.msg {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0 0;
+  align-items: flex-start;
+}
+
+.msg .who {
+  flex: none;
+  width: 5ch;
+  padding-top: 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.msg.user .who { color: var(--accent); }
+
+.msg .bubble {
+  flex: 1;
+  min-width: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  margin: 6px 0 4px;
 }
+
+.msg.user .bubble { color: var(--text); }
+
+.msg.pending .bubble { color: var(--dim); animation: blink 1.1s ease-in-out infinite; }
+
+@keyframes blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+.prose + .prose, .codewrap + .prose, .prose + .codewrap, .codewrap + .codewrap { margin-top: 8px; }
+
+.codewrap {
+  position: relative;
+  margin: 8px 0;
+}
+
+pre.code {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+pre.code code {
+  font-family: var(--mono);
+  white-space: pre;
+  color: var(--text);
+}
+
+.codewrap .copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.codewrap:hover .copy, .codewrap .copy:focus-visible { opacity: 1; }
 
 .sources {
   margin: 8px 0 2px;
