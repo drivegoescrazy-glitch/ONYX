@@ -18,7 +18,7 @@ import (
 )
 
 // Version is stamped by release builds: -ldflags "-X main.Version=x.y.z".
-var Version = "1.0.0"
+var Version = "1.1.0"
 
 var ui = tui.New()
 

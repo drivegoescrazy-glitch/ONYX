@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0
+
+- Base training pack rebuilt and expanded to 112 records: everyday conversation
+  (greetings, small talk, politeness, plans, phone, travel, interviews) and
+  English usage, plus a full Python section — running scripts, types, strings,
+  loops, lists, dicts, comprehensions, sorting, functions, files, CSV, JSON,
+  errors, modules, venv/pip, argparse, pathlib, subprocess, datetime, regex,
+  classes, dataclasses, type hints, debugging and testing — with five complete
+  recipes (word count, bulk rename, CSV summary, calculator, API fetch).
+- `their`, `there`, `they`, `its` and `your` are no longer stopwords, so
+  questions about those words find their records in both engines.
+- Version 1.1.0 across the CLI, the browser build and the release assets.
+
 ## 1.0.0
 
 First release of the ONYX CLI.

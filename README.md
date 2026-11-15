@@ -6,7 +6,7 @@ You teach it with training data you own. Training stores the knowledge in the ap
 
 ```
 ╭────────────────────────────────────────────────────────────╮
-│ >_ ONYX (v1.0.0)                                           │
+│ >_ ONYX (v1.1.0)                                           │
 │                                                            │
 │ model:      knowledge-only (offline)                       │
 │ knowledge:  7 records · 14.2 kB                            │
