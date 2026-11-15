@@ -72,7 +72,7 @@ text is chunked into doc records. Aliases `question`/`answer`,
 `prompt`/`completion`, `instruction`/`response` and OpenAI-style `messages`
 are accepted, so packs written for other trainers usually load unchanged.
 
-A ready-made starter pack ships with the repo — [training/base-training.jsonl](training/base-training.jsonl), 53 records on basic conversation and English usage — and is attached to the release as `base-training.jsonl`:
+A ready-made starter pack ships with the repo — [training/base-training.jsonl](training/base-training.jsonl), 112 records on basic conversation, English usage and Python (with runnable snippets and five complete recipes) — and is attached to the release as `base-training.jsonl`:
 
 ```sh
 onyx train base-training.jsonl
