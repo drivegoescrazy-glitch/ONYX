@@ -10,9 +10,11 @@ phrasings of the same social situation without repeating a line.
 Output: training/conversation/part-NN.jsonl, 100,000 records per part.
 """
 
+import argparse
 import itertools
 import json
 import re
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,23 +27,62 @@ NAMES = [
     "Fatima", "Grace", "Hugo", "Ivy", "Jamal", "Kai", "Lena", "Marco", "Nina", "Omar",
     "Pablo", "Quinn", "Rosa", "Sami", "Tara", "Umberto", "Vera", "Wei", "Xena", "Yusuf",
     "Zoe", "Ana", "Bo", "Cara", "Dev", "Eve", "Finn", "Gina", "Hal", "Ines",
+    "Jonas", "Kira", "Liam", "Maya", "Noah", "Olga", "Piet", "Ravi", "Sofia", "Theo",
+    "Uma", "Viktor", "Willa", "Yara", "Zane", "Amara", "Bilal", "Cleo", "Dario", "Esme",
+    "Farid", "Greta", "Hana", "Idris", "Juno", "Karim", "Leila", "Milo", "Nadia", "Owen",
+    "Petra", "Rafael", "Selin", "Tomas", "Ursula", "Vince", "Wendy", "Yann", "Zara", "Arun",
+    "Bea", "Cyrus", "Delia", "Emeka", "Fiona", "Gus", "Hiro", "Iris", "Jules", "Kofi",
+    "Lucia", "Mateo", "Noor", "Otto", "Pia", "Rhea", "Sven", "Tessa", "Umar", "Vera",
+    "Wes", "Yuki", "Zoha", "Adil", "Bree", "Cato", "Dima", "Elsa", "Fred", "Gita",
+    "Hector", "Imran", "Jada", "Kemal", "Lars", "Mira", "Nils", "Orla", "Pavel", "Rina",
 ]
-TIMES = ["9am", "10:30", "noon", "1pm", "2:30", "3pm", "4:15", "5pm", "6pm", "7pm", "8pm", "9am tomorrow"]
+TIMES = [
+    "7am", "8am", "9am", "9:30", "10am", "10:30", "11am", "11:45", "noon", "12:30",
+    "1pm", "1:30", "2pm", "2:30", "3pm", "3:30", "4pm", "4:15", "4:45", "5pm",
+    "5:30", "6pm", "6:30", "7pm", "8pm", "9am tomorrow", "2pm tomorrow",
+]
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 TOPICS = [
     "deadline", "budget", "new hire", "client call", "outage",
     "roadmap", "invoice", "design review", "test failures", "release",
     "holiday plan", "football match", "weather", "traffic", "new café",
     "office move", "training session", "interview panel", "audit", "quarterly report",
+    "onboarding doc", "pricing page", "support queue", "security review", "backlog",
+    "sprint plan", "hiring plan", "content calendar", "vendor contract", "renewal",
+    "office refit", "travel booking", "team offsite", "lunch order", "shift rota",
+    "conference talk", "blog post", "demo script", "data migration", "api change",
+    "access request", "incident report", "monthly numbers", "customer complaint", "board deck",
+    "sales pipeline", "on-call handover", "budget forecast", "contract review", "product launch",
+    "website refresh", "email campaign", "training budget", "new laptop order", "office plants",
+    "car booking", "meeting notes", "action list", "risk register", "holiday cover",
 ]
+
 PLACES = [
     "station", "café on the corner", "third floor", "main entrance",
     "car park", "meeting room", "airport", "hotel lobby", "library",
-    "co-working space", "supermarket", "gym",
+    "co-working space", "supermarket", "gym", "reception", "roof terrace",
+    "conference room", "print room", "break room", "loading bay", "bus stop",
+    "client office", "warehouse", "lab", "studio", "lecture hall", "canteen",
+    "bike shed", "side entrance", "back stairs", "front desk", "meeting pod",
+    "coffee stand", "quiet room", "training room", "basement", "annex",
+    "north wing", "south gate", "visitor centre", "service desk", "staff room",
 ]
 PRODUCTS = [
     "laptop", "monitor", "invoice", "report", "ticket", "order",
-    "subscription", "headset", "printer", "licence",
+    "subscription", "headset", "printer", "licence", "badge", "keyboard",
+    "phone", "tablet", "dock", "charger", "cable", "webcam", "microphone",
+    "speaker", "router", "server rack", "backup drive", "software key",
+    "support contract", "warranty", "delivery", "courier parcel", "quote",
+    "purchase order", "credit note", "statement", "receipt", "booking",
+    "access pass", "parking permit", "training seat", "seat licence",
+    "conference pass", "health check",
+]
+
+DISHES = [
+    "chicken sandwich", "mushroom risotto", "beef burger", "veggie wrap", "fish and chips",
+    "caesar salad", "margherita pizza", "lentil soup", "pad thai", "steak",
+    "omelette", "club sandwich", "ramen", "falafel plate", "pasta bake",
+    "pancakes", "sushi set", "kebab", "quiche", "jacket potato",
 ]
 
 SLOTS = {
@@ -51,6 +92,7 @@ SLOTS = {
     "topic": TOPICS,
     "place": PLACES,
     "product": PRODUCTS,
+    "dish": DISHES,
 }
 
 # Each scenario:
@@ -331,13 +373,13 @@ SCENARIOS = [
     {
         "tags": ["chat", "food"],
         "lines": [
-            "could i get the {product}, please", "table for two at {time}",
-            "is the {topic} vegetarian", "could we get the bill",
-            "what do you recommend", "can i change my order to the {product}",
+            "could i get the {dish}, please", "table for two at {time}",
+            "is the {dish} vegetarian", "could we get the bill",
+            "what do you recommend", "can i change my order to the {dish}",
         ],
         "replies": [
-            "Of course — the {product} for two, at {time}?",
-            "Yes, it's vegetarian. Anything to drink with that?",
+            "Of course — the {dish} for two, at {time}?",
+            "Yes, the {dish} is vegetarian. Anything to drink with that?",
             "I'll bring the bill over. Card or cash?",
         ],
         "asks": [
@@ -652,9 +694,21 @@ def scenario_stream(scenario, counter):
 
 
 def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for old in OUT_DIR.glob("part-*.jsonl"):
-        old.unlink()
+    parser = argparse.ArgumentParser(description="Generate conversation training records")
+    parser.add_argument("--total", type=int, default=TOTAL, help="how many records to write")
+    parser.add_argument("--out", type=Path, default=None, help="write one single file instead of parts")
+    parser.add_argument("--part-size", type=int, default=PART_SIZE)
+    parser.add_argument("--lean", action="store_true", help="write only input and output, for the smallest file")
+    args = parser.parse_args()
+
+    total = args.total
+    single = args.out
+    if single:
+        single.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        for old in OUT_DIR.glob("part-*.jsonl"):
+            old.unlink()
 
     seen = set()
     written = 0
@@ -663,18 +717,21 @@ def main():
     counters = {index: [0] for index in range(len(SCENARIOS))}
     streams = [scenario_stream(scenario, counters[index]) for index, scenario in enumerate(SCENARIOS)]
 
-    def next_part():
+    def open_target():
         nonlocal handle, parts
+        if single:
+            handle = single.open("w", encoding="utf-8")
+            return
         if handle:
             handle.close()
             path = OUT_DIR / f"part-{parts:02d}.jsonl"
-            print(f"{path.relative_to(ROOT)}: {PART_SIZE} records, {path.stat().st_size / 1024 / 1024:.1f} MB")
+            print(f"{path.relative_to(ROOT)}: {args.part_size} records, {path.stat().st_size / 1024 / 1024:.1f} MB", flush=True)
         parts += 1
         handle = (OUT_DIR / f"part-{parts:02d}.jsonl").open("w", encoding="utf-8")
 
-    next_part()
+    open_target()
     # Round-robin so every scenario contributes evenly, until the pack is full.
-    while written < TOTAL and streams:
+    while written < total and streams:
         alive = []
         for stream in streams:
             try:
@@ -682,31 +739,36 @@ def main():
             except StopIteration:
                 continue
             alive.append(stream)
-            key = question.lower()
+            key = hash(question.lower())
             if key in seen:
                 continue
             seen.add(key)
             written += 1
-            record = {
-                "id": f"conv-{written:06d}",
-                "input": question,
-                "output": answer,
-                "tags": tags,
-            }
+            if args.lean:
+                record = {"input": question, "output": answer}
+            else:
+                record = {"id": f"conv-{written:06d}", "input": question, "output": answer, "tags": tags}
             handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
-            if written % PART_SIZE == 0 and written < TOTAL:
-                next_part()
-            if written >= TOTAL:
+            if written % 500000 == 0:
+                handle.flush()
+                print(f"  {written:,} records", flush=True)
+            if not single and written % args.part_size == 0 and written < total:
+                open_target()
+            if written >= total:
                 break
         streams = alive
 
     if handle:
         handle.close()
+    if single:
+        size = single.stat().st_size
+        print(f"{single}: {written:,} records, {size / 1024 / 1024:.1f} MB", flush=True)
+    else:
         path = OUT_DIR / f"part-{parts:02d}.jsonl"
-        print(f"{path.relative_to(ROOT)}: {written - (parts - 1) * PART_SIZE} records, {path.stat().st_size / 1024 / 1024:.1f} MB")
-    if written < TOTAL:
+        print(f"{path.relative_to(ROOT)}: {written - (parts - 1) * args.part_size} records, {path.stat().st_size / 1024 / 1024:.1f} MB", flush=True)
+    if written < total:
         raise SystemExit(f"only generated {written} unique lines; widen the slot banks")
-    print(f"{written} records in {parts} parts")
+    print(f"{written:,} records written")
 
 
 if __name__ == "__main__":

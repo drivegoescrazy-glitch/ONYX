@@ -5,3 +5,6 @@ onyx
 .onyx/
 .DS_Store
 __pycache__/
+
+# generated locally: far beyond the 100 MB GitHub file limit
+training/conversation-10m.jsonl

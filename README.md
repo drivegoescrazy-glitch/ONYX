@@ -81,6 +81,14 @@ onyx train training/conversation      # all five parts, 500,000 records
 onyx train training/conversation/part-01.jsonl
 ```
 
+For a single very large file, ask the generator for one:
+
+```
+python3 training/build_conversation.py --total 10000000 --out training/conversation-10m.jsonl --lean
+```
+
+That writes 10,000,000 records (about 1.4 GB) as one JSONL file. GitHub rejects files over 100 MB, so it is generated locally and ignored by git; the generator is what lives in the repo.
+
 In the browser app, train one part at a time: 100,000 records takes a few seconds and about 200 MB of memory, and answers come back in about a second. The whole 500,000 is comfortable in the CLI (about 30 seconds to train), though each `onyx ask` rebuilds the index and takes around 15 seconds — the REPL builds it once.
 
 ### Starter pack
