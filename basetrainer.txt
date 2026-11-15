@@ -125,6 +125,9 @@ save it and run:
 
     onyx train training.jsonl
 
+The same file feeds the browser app too (Train panel, or /train), which saves
+knowledge in the browser and exports onyx-knowledge.json for the CLI.
+
 Accepted input files: .jsonl (one record per line), .json (array of records,
 or {"records":[...]}), and .txt/.md (split into doc chunks automatically).
 Aliases accepted: question/answer, prompt/completion, instruction/response,

@@ -16,6 +16,14 @@ You teach it with training data you own. Training stores the knowledge in the ap
 ╰────────────────────────────────────────────────────────────╯
 ```
 
+## Browser app
+
+No install, no exe, no Windows SmartScreen prompt: **https://site-c5423373870c460895e45d16d0787a48.freebuff.page**
+
+The browser build in [`web/`](web/) is the same ONYX — Codex-style terminal UI, JSONL training, the same retrieval engine — with knowledge saved in the browser instead of a file. Train with the **Train** panel or `/train`, then ask anything. Knowledge lives in this browser's storage, so **Export** writes `onyx-knowledge.json`, and importing that file (or pointing the CLI at it with `onyx train onyx-knowledge.json`) moves packs between the two clients.
+
+Run it locally: open `web/public/index.html`, or `python3 -m http.server 3000 --directory web/public`. The engine in `web/public/onyx-core.js` is a direct port of `internal/knowledge`, verified to rank packs identically.
+
 ## Build
 
 Single static binary, standard library only (Go 1.22+):

@@ -12,5 +12,10 @@ First release of the ONYX CLI.
   `ONYX_MODEL` feeds retrieved records to any OpenAI-compatible server.
 - `onyx ask`, `onyx knowledge`, `onyx forget`, `onyx version`.
 - `basetrainer.txt`: generator prompt plus the training-data spec and example.
+- Browser build (`web/`) of the same app: no install and no SmartScreen
+  prompt, Codex-style UI, JSONL training via file drop, picker or paste,
+  knowledge saved in the browser with export/import of `onyx-knowledge.json`,
+  and an optional local model. `web/public/onyx-core.js` ports the retrieval
+  engine and ranks packs identically to the CLI.
 - `.github/workflows/release.yml` builds Windows/Linux/macOS binaries for
   every `v*` tag and attaches them to the release.
