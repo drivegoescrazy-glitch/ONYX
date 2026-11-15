@@ -14,6 +14,7 @@
     index: null,
     config: { model_url: '', model: '' },
     memoryOnly: false,
+    storageMode: 'localStorage',
     storageWarned: false,
     history: [],
     historyIndex: 0,
@@ -21,6 +22,10 @@
   };
 
   /* ---------------------------------------------------------------- store ---- */
+
+  var DB_NAME = 'onyx';
+  var DB_STORE = 'knowledge';
+  var dbPromise = null;
 
   function storageGet(key) {
     try {
@@ -38,6 +43,76 @@
     } catch (err) {
       state.memoryOnly = true;
       return false;
+    }
+  }
+
+  function db() {
+    if (!dbPromise) {
+      dbPromise = new Promise(function (resolve, reject) {
+        if (!window.indexedDB) {
+          reject(new Error('this browser has no IndexedDB'));
+          return;
+        }
+        var request = window.indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = function () {
+          var handle = request.result;
+          if (!handle.objectStoreNames.contains(DB_STORE)) handle.createObjectStore(DB_STORE);
+        };
+        request.onsuccess = function () { resolve(request.result); };
+        request.onerror = function () { reject(request.error || new Error('IndexedDB could not open')); };
+      });
+    }
+    return dbPromise;
+  }
+
+  function idbGet(key) {
+    return db().then(function (handle) {
+      return new Promise(function (resolve, reject) {
+        var request = handle.transaction(DB_STORE, 'readonly').objectStore(DB_STORE).get(key);
+        request.onsuccess = function () { resolve(request.result || null); };
+        request.onerror = function () { reject(request.error || new Error('read failed')); };
+      });
+    });
+  }
+
+  function idbSet(key, value) {
+    return db().then(function (handle) {
+      return new Promise(function (resolve, reject) {
+        var transaction = handle.transaction(DB_STORE, 'readwrite');
+        var request = transaction.objectStore(DB_STORE).put(value, key);
+        transaction.oncomplete = function () { resolve(true); };
+        transaction.onerror = function () { reject(transaction.error || new Error('write failed')); };
+        request.onerror = function () { reject(request.error || new Error('write failed')); };
+      });
+    });
+  }
+
+  // Knowledge lives in IndexedDB because a large pack does not fit in
+  // localStorage (roughly 5 MB). localStorage is kept as a fallback and as the
+  // place older versions of the app stored their records.
+  async function readKnowledge() {
+    try {
+      var stored = await idbGet('records');
+      if (stored) {
+        state.storageMode = 'indexeddb';
+        return stored;
+      }
+    } catch (err) {
+      state.storageMode = 'localStorage';
+    }
+    var legacy = storageGet(KB_KEY);
+    if (legacy) state.storageMode = 'localStorage';
+    return legacy;
+  }
+
+  async function writeKnowledge(value) {
+    try {
+      await idbSet('records', value);
+      state.storageMode = 'indexeddb';
+      return true;
+    } catch (err) {
+      state.storageMode = 'localStorage';
+      return storageSet(KB_KEY, value);
     }
   }
 
@@ -66,9 +141,9 @@
 
   function reindex() { state.index = Core.buildIndex(state.records); }
 
-  function save() {
+  async function save() {
     state.manifest.tokens = Core.countTokens(state.records);
-    var ok = storageSet(KB_KEY, JSON.stringify(payload()));
+    var ok = await writeKnowledge(JSON.stringify(payload()));
     if (!ok && !state.storageWarned) {
       state.storageWarned = true;
       line('warn', '! this browser blocked storage — knowledge stays in this tab only, use Export');
@@ -179,7 +254,7 @@
 
   function plural(n, word) {
     if (n === 1) return '1 ' + word;
-    return n + ' ' + (/y$/.test(word) ? word.slice(0, -1) + 'ies' : word + 's');
+    return formatNum(n) + ' ' + (/y$/.test(word) ? word.slice(0, -1) + 'ies' : word + 's');
   }
 
   function formatNum(n) {
@@ -209,7 +284,9 @@
     $('#b-knowledge').textContent = state.records.length
       ? plural(state.records.length, 'record') + ' · ' + fmtBytes(kbBytes())
       : 'none yet — Train to teach it';
-    $('#b-store').textContent = state.memoryOnly ? 'browser · this session only' : 'browser · localStorage';
+    $('#b-store').textContent = state.memoryOnly
+      ? 'browser · this session only'
+      : (state.storageMode === 'indexeddb' ? 'browser · IndexedDB' : 'browser · localStorage');
     $('#train-status').textContent = state.records.length
       ? plural(state.records.length, 'record') + ' trained · saved in this browser'
       : 'Nothing trained yet.';
@@ -302,6 +379,12 @@
         console.warn('onyx: local model unavailable, answering from trained knowledge', err);
       }
     }
+    // A trained record that clearly matches beats the built-in starter, so a
+    // pack you trained yourself is always used first.
+    var best = hits[0];
+    var trainedScript = best && best.score >= 18 && /```python/.test(Core.body(best.record)) &&
+      Core.termCoverage(state.index, best.record, query) >= 0.6;
+    if (trainedScript) return { text: Core.retrievalAnswer(hits) };
     var program = Core.programAnswer(query);
     if (program) return { text: program.text };
     return { text: Core.retrievalAnswer(hits) };
@@ -367,7 +450,7 @@
     return out;
   }
 
-  function applyTraining(batch, replace) {
+  async function applyTraining(batch, replace) {
     if (!batch.records.length) {
       line('warn', '! no usable training records — the format is in basetrainer.txt');
       batch.warnings.forEach(function (warning) { line('warn', '! ' + warning); });
@@ -379,7 +462,7 @@
     state.manifest.sources = mergeSources(state.manifest.sources, batch.sources);
     state.manifest.updated = new Date().toISOString();
     reindex();
-    save();
+    await save();
 
     line('head', '› training');
     var details = ['parsed ' + plural(batch.records.length, 'record') + ' from ' + plural(batch.files, 'file')];
@@ -400,17 +483,17 @@
   async function trainFromFiles(files, replace) {
     if (!files || !files.length) return;
     var batch = await filesToBatch(files);
-    applyTraining(batch, replace);
+    await applyTraining(batch, replace);
   }
 
-  function trainFromPaste() {
+  async function trainFromPaste() {
     var text = $('#paste').value.trim();
     if (!text) {
       line('warn', '! nothing pasted — paste JSONL records or choose files');
       return;
     }
     var result = Core.parseFileContent('pasted.jsonl', text);
-    applyTraining({
+    await applyTraining({
       records: result.records,
       skipped: result.skipped,
       warnings: result.warnings,
@@ -438,7 +521,7 @@
     line('ok', '✓ exported ' + plural(state.records.length, 'record') + ' to onyx-knowledge.json');
   }
 
-  function forgetAll() {
+  async function forgetAll() {
     if (!state.records.length) {
       line('dim', '  nothing trained yet');
       return;
@@ -455,7 +538,7 @@
       sources: []
     };
     reindex();
-    save();
+    await save();
     line('ok', '✓ knowledge cleared — nothing trained in this browser now');
   }
 
@@ -608,8 +691,8 @@
     input.style.height = Math.min(input.scrollHeight, max) + 'px';
   }
 
-  function load() {
-    var raw = storageGet(KB_KEY);
+  async function load() {
+    var raw = await readKnowledge();
     if (raw) {
       try {
         var data = JSON.parse(raw);
@@ -643,8 +726,8 @@
     state.manifest.tokens = Core.countTokens(state.records);
   }
 
-  function boot() {
-    load();
+  async function boot() {
+    await load();
     updateChrome();
     renderKnowledge();
     fillModelInputs();

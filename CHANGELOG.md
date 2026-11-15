@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Base training pack built out to 10,000 records. It is generated, not hand assembled: `python3 training/build_pack.py` reads `training/seed.jsonl` (conversation, English, core Python answers), `training/recipes.py` (complete scripts) and the local interpreter's standard library, then writes `training/base-training.jsonl`.
+- New script library: 40 recipes with several file, column and URL variants each — word counts, CSV filtering/sorting/grouping/summing, CSV↔JSON, email, website checks, image thumbnails, link scraping, dedupe, backup, rename, cleanup, search and replace, SQLite, retries, argparse, logging, HTML reports and folder watching. Every generated script is parsed with `ast` before it is written.
+- About 1,500 answers on Python practice: file handling, CSV, JSON, dates, regex, subprocess, testing, packaging, environment variables, performance and every common traceback.
+- About 7,000 standard-library reference records pulled from the running interpreter: signatures and summaries for `itertools`, `collections`, `pathlib`, `datetime`, `json`, `csv`, `re`, `subprocess`, `sqlite3`, `argparse`, `logging`, `typing`, `unittest` and the methods on `str`, `list`, `dict` and `set`.
+- Browser app: knowledge is stored in IndexedDB (with a localStorage fallback), so a pack this size fits; a trained script that clearly matches the question now wins over the built-in starter template.
+
 ## 1.1.0
 
 - Base training pack rebuilt and expanded to 112 records: everyday conversation

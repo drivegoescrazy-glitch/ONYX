@@ -4,3 +4,4 @@ onyx
 onyx-*
 .onyx/
 .DS_Store
+__pycache__/
